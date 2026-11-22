@@ -1,0 +1,24 @@
+{
+  "name": "agency-atlas",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/export-data.mjs && ASTRO_TELEMETRY_DISABLED=1 astro dev",
+    "build": "node scripts/export-data.mjs && ASTRO_TELEMETRY_DISABLED=1 astro build",
+    "preview": "ASTRO_TELEMETRY_DISABLED=1 astro preview",
+    "export:data": "node scripts/export-data.mjs",
+    "test:ui": "node scripts/test-ui.mjs",
+    "test:a11y": "node scripts/audit-a11y.mjs"
+  },
+  "dependencies": {
+    "@fontsource-variable/geist": "^5.3.0",
+    "@fontsource-variable/geist-mono": "^5.3.0",
+    "@fontsource/instrument-serif": "^5.3.0",
+    "astro": "^7.4.13"
+  },
+  "devDependencies": {
+    "axe-core": "^4.14.1",
+    "playwright-core": "^1.65.1"
+  }
+}

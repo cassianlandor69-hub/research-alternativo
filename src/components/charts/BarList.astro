@@ -1,0 +1,30 @@
+---
+interface Item {
+  label: string;
+  value: number;
+  color?: string;
+}
+interface Props {
+  items: Item[];
+  max?: number;
+  showShare?: boolean;
+  total?: number;
+}
+const { items, max, showShare = false, total } = Astro.props;
+const peak = max ?? Math.max(...items.map((i) => i.value), 1);
+const sum = total ?? items.reduce((acc, i) => acc + i.value, 0);
+---
+<div class="bar-list">
+  {items.map((item) => (
+    <div class="bar-row" data-tip={`${item.label} · ${item.value}`}>
+      <span class="bar-label">{item.label}</span>
+      <span class="bar-value">
+        {item.value}
+        {showShare && sum > 0 && <small>{Math.round((item.value / sum) * 100)}%</small>}
+      </span>
+      <span class="bar-track">
+        <span class="bar-fill" style={`--w:${Math.max((item.value / peak) * 100, 2)}%;--c:${item.color ?? "var(--lime)"}`} />
+      </span>
+    </div>
+  ))}
+</div>

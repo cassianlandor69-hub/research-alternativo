@@ -1,0 +1,14 @@
+---
+interface Props {
+  label: string;
+  color?: string;
+  variant?: "outline" | "plain" | "solid";
+  dot?: boolean;
+  class?: string;
+}
+const { label, color = "#8b93a7", variant = "outline", dot = true, class: className = "" } = Astro.props;
+---
+<span
+  class:list={["badge", { "badge--plain": variant === "plain", "badge--solid": variant === "solid" }, className]}
+  style={variant === "outline" ? `--badge:${color}` : undefined}
+>{label}</span>

@@ -1,0 +1,154 @@
+---
+import Base from "../layouts/Base.astro";
+import Icon from "../components/ui/Icon.astro";
+import Badge from "../components/ui/Badge.astro";
+import { data, initials, avatarStyle, pct } from "../lib/data";
+
+const { people, stats, aggregates } = data;
+const founders = people.filter((p) => p.isFounder).length;
+const directors = people.filter((p) => p.roles.some((r) => r.roleType === "director")).length;
+const multi = people.filter((p) => p.roles.length > 1).length;
+const coveredAgencies = aggregates.coverage.people;
+
+const roleTypeLabel = (t: string) => (t === "founder" ? "Fundador/a" : t === "partner" ? "Socio/a" : "Director/a");
+
+const searchText = (p: (typeof people)[number]) =>
+  [
+    p.name,
+    ...p.agencies,
+    ...p.roles.map((r) => `${r.role} ${r.agencyName} ${roleTypeLabel(r.roleType)}`),
+    p.bio,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+---
+<Base
+  title="Personas — Agency Atlas"
+  description={`Los fundadores, directores y socios que dirigen las agencias españolas. ${stats.people} personas en ${coveredAgencies} agencias.`}
+  active="people"
+>
+  <div class="container">
+    <section class="page-head">
+      <p class="eyebrow"><span class="dot"></span>Directorio · {stats.people} personas</p>
+      <h1 class="page-title">Las <em>personas</em> detrás del trabajo.</h1>
+      <p class="page-lede">
+        Fundadores, directores creativos, directores generales y socios: {stats.people} personas vinculadas a
+        {coveredAgencies} agencias mediante {stats.agencyPeopleLinks} roles documentados. Busca por nombre, cargo o
+        agencia.
+      </p>
+      <div class="page-stats">
+        <span class="page-stat"><b>{stats.people}</b> personas</span>
+        <span class="page-stat"><b>{stats.agencyPeopleLinks}</b> vínculos de rol</span>
+        <span class="page-stat"><b>{founders}</b> fundadores</span>
+        <span class="page-stat"><b>{directors}</b> directores</span>
+        <span class="page-stat"><b>{multi}</b> con varios roles</span>
+        <span class="page-stat"><b>{pct(coveredAgencies, stats.agencies)}%</b> de agencias cubiertas</span>
+      </div>
+    </section>
+  </div>
+
+  <div data-explorer>
+    <div class="explorer-sticky">
+      <div class="container">
+        <div class="toolbar">
+          <label class="field">
+            <Icon name="search" />
+            <input
+              type="search"
+              data-filter-search
+              placeholder="Buscar una persona, un cargo o una agencia…"
+              aria-label="Buscar personas"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </label>
+          <span class="toolbar-count"><b data-count>{stats.people}</b> personas</span>
+        </div>
+        <div class="filters" role="group" aria-label="Filtrar personas">
+          <button class="filter-chip" type="button" data-filter="type" data-value="all" aria-pressed="true">
+            Todas las personas <span class="n">{stats.people}</span>
+          </button>
+          <button class="filter-chip" type="button" data-filter="type" data-value="founder" aria-pressed="false">
+            <span class="dot" style="--c:#c9f158"></span> Fundadores <span class="n">{founders}</span>
+          </button>
+          <button class="filter-chip" type="button" data-filter="type" data-value="director" aria-pressed="false">
+            <span class="dot" style="--c:#5cc8ff"></span> Directores <span class="n">{directors}</span>
+          </button>
+          <button class="filter-chip" type="button" data-filter="type" data-value="multi" aria-pressed="false">
+            <span class="dot" style="--c:#b79cff"></span> Varios roles <span class="n">{multi}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="results">
+        <div class="results-head">
+          <span class="results-label">Mostrando <b data-count>{stats.people}</b> de {stats.people} personas</span>
+          <div class="results-tools">
+            <span class="results-label" aria-hidden="true">CARGO · AGENCIA</span>
+            <button class="reset-link" type="button" data-reset>Limpiar ×</button>
+          </div>
+        </div>
+
+        <div class="people-grid" data-items style="margin-top:18px">
+          {people.map((p) => (
+            <article
+              class="person-card"
+              id={`p-${p.id}`}
+              data-item
+              data-search={searchText(p)}
+              data-type={[...new Set([...p.roles.map((r) => r.roleType), ...(p.roles.length > 1 ? ["multi"] : [])])].join(" ")}
+            >
+              <span class="avatar" style={avatarStyle(p.name)} aria-hidden="true">{initials(p.name)}</span>
+              <div class="person-main">
+                <div class="person-name">
+                  <span>{p.name}</span>
+                  {p.linkedinUrl && (
+                    <a class="linkedin" href={p.linkedinUrl} target="_blank" rel="noopener noreferrer" aria-label={`${p.name} en LinkedIn`}>
+                      <Icon name="external" />
+                    </a>
+                  )}
+                </div>
+                <div class="person-roles">
+                  {p.roles.map((r) => (
+                    <span class="person-role">
+                      <b>{r.role}</b>
+                      <span aria-hidden="true">·</span>
+                      {r.agencySlug ? <a href={`/agencias/${r.agencySlug}/`}>{r.agencyName}</a> : <span>{r.agencyName}</span>}
+                    </span>
+                  ))}
+                </div>
+                <div class="person-flags">
+                  {p.isFounder
+                    ? <Badge label="Fundador/a" color="#c9f158" />
+                    : <Badge label="Director/a" color="#5cc8ff" variant="plain" />}
+                  {p.roles.length > 1 && <Badge label={`${p.roles.length} roles`} color="#5cc8ff" variant="plain" />}
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+
+        <div class="empty" data-empty>
+          <Icon name="search" size={26} />
+          <p>Ninguna persona coincide con esa búsqueda.</p>
+          <button type="button" data-reset>Quitar filtros</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <p class="note" style="margin-top:26px">
+      <Icon name="info" />
+      Las personas se deduplican por nombre normalizado. Una misma persona puede ocupar roles en más de una
+      agencia; el tipo de rol procede del registro de origen, no de una situación laboral actual.
+    </p>
+  </div>
+
+  <script>
+    import "../scripts/explorer.js";
+  </script>
+</Base>

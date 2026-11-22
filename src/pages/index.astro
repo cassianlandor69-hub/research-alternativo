@@ -1,0 +1,466 @@
+---
+import Base from "../layouts/Base.astro";
+import Icon from "../components/ui/Icon.astro";
+import Donut from "../components/charts/Donut.astro";
+import BarList from "../components/charts/BarList.astro";
+import PulseChart from "../components/charts/PulseChart.astro";
+import {
+  data,
+  classMeta,
+  categoryMeta,
+  sourceLabel,
+  fmtNum,
+  fmtDate,
+  dateParts,
+  pct,
+} from "../lib/data";
+
+const { stats, aggregates, ingest } = data;
+
+const classSegments = aggregates.byClassification.map((c) => ({
+  label: classMeta(c.key).label,
+  value: c.value,
+  color: classMeta(c.key).color,
+}));
+const topClass = aggregates.byClassification[0];
+const prMedia = (aggregates.byClassification.find((c) => c.key === "pr_communication")?.value ?? 0) +
+  (aggregates.byClassification.find((c) => c.key === "media")?.value ?? 0);
+
+const independent = aggregates.byHolding.find((h) => h.key === "Independent / no group")?.value ?? 0;
+const otherGroup = aggregates.byHolding.find((h) => h.key === "Other group")?.value ?? 0;
+const bigSix = aggregates.byHolding
+  .filter((h) => ["WPP", "Omnicom", "Publicis", "IPG", "Havas", "Dentsu"].includes(h.key))
+  .sort((a, b) => b.value - a.value);
+const bigSixTotal = bigSix.reduce((acc, h) => acc + h.value, 0);
+
+const holdingColors: Record<string, string> = {
+  WPP: "#5cc8ff",
+  Omnicom: "#b79cff",
+  Publicis: "#ff8fb1",
+  IPG: "#ffb454",
+  Havas: "#4ade80",
+  Dentsu: "#f7d046",
+};
+
+const cityItems = aggregates.byCity.map((c) => ({
+  label: c.key === "Not listed" ? "Sin ciudad" : c.key,
+  value: c.value,
+  color: c.key === "Not listed" ? "#4a5262" : "#c9f158",
+}));
+
+const pressItems = aggregates.bySource.slice(0, 7).map((s, i) => ({
+  label: sourceLabel(s.key),
+  value: s.value,
+  color: ["#c9f158", "#b6e34a", "#a2d43f", "#8dc536", "#7ab52f", "#68a528", "#579421"][i],
+}));
+
+const categoryItems = aggregates.byCategory.map((c) => ({
+  label: categoryMeta(c.key).label,
+  value: c.value,
+  color: categoryMeta(c.key).color,
+}));
+
+const roleItems = aggregates.topRoles.slice(0, 5);
+const founderLinks = aggregates.byRoleType.find((r) => r.key === "founder")?.value ?? 0;
+const directorLinks = aggregates.byRoleType.find((r) => r.key === "director")?.value ?? 0;
+
+const qualityItems = aggregates.quality
+  .filter((q) => ["description", "domain", "sources", "clout", "founded_year"].includes(q.field))
+  .map((q) => ({
+    ...q,
+    pctValue: pct(q.fill, q.total),
+    color: q.fill / q.total > 0.75 ? "#c9f158" : q.fill / q.total > 0.25 ? "#ffb454" : "#ff8fb1",
+  }));
+
+const pulseTotal = aggregates.newsByDay.reduce((acc, d) => acc + d.value, 0);
+const pulseDays = aggregates.newsByDay.length;
+const madrid = aggregates.byCity.find((c) => c.key === "Madrid")?.value ?? 0;
+const barcelona = aggregates.byCity.find((c) => c.key === "Barcelona")?.value ?? 0;
+const topPress = aggregates.bySource.slice(0, 2).reduce((acc, s) => acc + s.value, 0);
+const latestIngest = ingest.latest;
+const signalNews = aggregates.latestNews.slice(0, 4);
+
+const kpis = [
+  { label: "Agencias", value: stats.agencies, icon: "building", sub: `${stats.classifications} tipos de práctica`, href: "/agencias/" },
+  { label: "Personas", value: stats.people, icon: "users", sub: `${stats.agencyPeopleLinks} vínculos de rol`, href: "/personas/" },
+  { label: "Marcas cliente", value: stats.clients, icon: "briefcase", sub: `${stats.agencyClientsLinks} vínculos con agencias`, href: "/clientes/" },
+  { label: "Noticias", value: stats.news, icon: "news", sub: `${stats.sources} medios sectoriales`, href: "/noticias/" },
+  { label: "Ciudades", value: stats.cities, icon: "pin", sub: `Madrid lidera con ${madrid}`, href: "/agencias/?city=madrid" },
+];
+---
+<Base
+  title="Agency Atlas — El mapa de las agencias españolas"
+  description="Un atlas estático y navegable de las agencias de publicidad, medios y comunicación de España. Explora 170 agencias, 291 personas, 122 clientes y 154 noticias."
+  active="overview"
+>
+  <div class="container">
+    <section class="hero">
+      <div>
+        <p class="eyebrow"><span class="dot"></span>Inteligencia de mercado · España</p>
+        <h1>Todas las agencias de España, <em>mapeadas</em>.</h1>
+        <p class="hero-lede">
+          Una guía de campo estática del mercado agencial español: <strong>{stats.agencies} agencias</strong>,
+          <strong>{stats.people} personas</strong> y <strong>{stats.clients} marcas cliente</strong>, trazadas a través de
+          {stats.news} noticias de prensa sectorial. Cada registro está incluido en la compilación; busca, filtra y sigue
+          las conexiones sin backend.
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn--primary" href="/agencias/">
+            Explorar el directorio
+            <Icon name="arrow" />
+          </a>
+          <a class="btn btn--ghost" href="/datos/">Ver las notas de datos</a>
+        </div>
+        <div class="hero-foot">
+          <span><Icon name="database" /> agencies.db · esquema v{data.schemaVersion}</span>
+          <span><Icon name="clock" /> Última ingesta {fmtDate(latestIngest?.startedAt?.slice(0, 10), "long")}</span>
+          <span><Icon name="bolt" /> Totalmente estático · Astro</span>
+        </div>
+      </div>
+
+      <aside class="signal reveal" aria-label="Últimas noticias">
+        <div class="signal-head">
+          <span class="label"><Icon name="spark" /> Última señal</span>
+          <span class="card-meta">NOV 2026</span>
+        </div>
+        <ul class="signal-list">
+          {signalNews.map((n) => (
+            <li>
+              <a href={`/noticias/#n-${n.id}`}>
+                <span class="signal-title">{n.title}</span>
+                <span class="signal-meta">
+                  <span>{dateParts(n.publishedAt).day} {dateParts(n.publishedAt).month}</span>
+                  <i class="sep"></i>
+                  <span>{sourceLabel(n.source)}</span>
+                  <i class="sep"></i>
+                  <span style={`color:${categoryMeta(n.category).color}`}>{categoryMeta(n.category).label}</span>
+                </span>
+              </a>
+            </li>
+          ))}
+        </ul>
+        <div style="padding:11px 0 12px;border-top:1px solid var(--line)">
+          <a class="card-link" href="/noticias/">Ver las {stats.news} noticias <Icon name="arrow" size={11} /></a>
+        </div>
+      </aside>
+    </section>
+
+    <section class="kpi-grid reveal" aria-label="Totales de la base de datos">
+      {kpis.map((kpi) => (
+        <a class="kpi" href={kpi.href}>
+          <span class="kpi-label">{kpi.label}<Icon name={kpi.icon} /></span>
+          <span class="kpi-value">{fmtNum(kpi.value)}</span>
+          <span class="kpi-sub"><i class="tick"></i>{kpi.sub}</span>
+        </a>
+      ))}
+    </section>
+
+    <div class="section-head" style="margin-top:64px">
+      <div>
+        <span class="eyebrow"><span class="dot dot--violet"></span>El panorama</span>
+        <h2 class="section-title" style="margin-top:9px">Estructura, geografía y señal</h2>
+      </div>
+      <a class="section-link" href="/datos/">Cómo se construye <Icon name="arrow" size={12} /></a>
+    </div>
+
+    <div class="grid-12">
+      <section class="card col-5 reveal" aria-labelledby="mix-title">
+        <div class="card-head">
+          <div>
+            <p class="card-kicker">Composición</p>
+            <h3 class="card-title" id="mix-title">Mezcla de prácticas</h3>
+          </div>
+          <span class="card-meta">{stats.classifications} TIPOS</span>
+        </div>
+        <div class="card-body">
+          <Donut segments={classSegments} total={stats.agencies} centerLabel="agencias" />
+          <div class="mini-rule"></div>
+          <p class="note">
+            <Icon name="info" />
+            Las agencias creativas son el {pct(topClass.value, stats.agencies)} % del directorio. PR y medios suman
+            otro {pct(prMedia, stats.agencies)} %.
+          </p>
+        </div>
+      </section>
+
+      <section class="card col-3 reveal" aria-labelledby="ownership-title">
+        <div class="card-head">
+          <div>
+            <p class="card-kicker">Estructura</p>
+            <h3 class="card-title" id="ownership-title">Propiedad</h3>
+          </div>
+          <span class="card-meta">170</span>
+        </div>
+        <div class="card-body">
+          <div class="stack-bar" aria-hidden="true">
+            <i
+              style={`width:${(independent / stats.agencies) * 100}%;--c:#c9f158`}
+              data-tip={`Independiente / sin grupo · ${independent}`}></i>
+            <i
+              style={`width:${(otherGroup / stats.agencies) * 100}%;--c:#5b6474`}
+              data-tip={`Otro grupo · ${otherGroup}`}></i>
+            {bigSix.map((h) => (
+              <i
+                style={`width:${(h.value / stats.agencies) * 100}%;--c:${holdingColors[h.key]}`}
+                data-tip={`${h.key} · ${h.value}`}></i>
+            ))}
+          </div>
+          <div class="ownership-list">
+            <div class="ownership-row">
+              <i class="legend-dot" style="--c:#c9f158"></i>
+              <span class="legend-label">Independiente / sin grupo</span>
+              <span class="legend-count">{independent}</span>
+            </div>
+            <div class="ownership-row">
+              <i class="legend-dot" style="--c:#5b6474"></i>
+              <span class="legend-label">Otro grupo</span>
+              <span class="legend-count">{otherGroup}</span>
+            </div>
+            <div class="ownership-row">
+              <i class="legend-dot" style="--c:#a78bfa"></i>
+              <span class="legend-label">Los seis grandes</span>
+              <span class="legend-count">{bigSixTotal}</span>
+            </div>
+          </div>
+          <div class="mini-rule"></div>
+          <div class="ownership-list">
+            {bigSix.map((h) => (
+              <div class="ownership-row">
+                <i class="legend-dot" style={`--c:${holdingColors[h.key]}`}></i>
+                <span class="legend-label">{h.key}</span>
+                <span class="legend-count">{h.value}</span>
+              </div>
+            ))}
+          </div>
+          <p class="note" style="margin-top:12px">
+            <Icon name="info" />
+            {independent} agencias están fuera de cualquier red declarada.
+          </p>
+        </div>
+      </section>
+
+      <section class="card col-4 reveal" aria-labelledby="geo-title">
+        <div class="card-head">
+          <div>
+            <p class="card-kicker">Geografía</p>
+            <h3 class="card-title" id="geo-title">Dónde están</h3>
+          </div>
+          <span class="card-meta">{stats.cities} CIUDADES</span>
+        </div>
+        <div class="card-body">
+          <BarList items={cityItems.slice(0, 7)} showShare total={stats.agencies} />
+          <div class="mini-rule"></div>
+          <p class="note">
+            <Icon name="pin" />
+            Madrid y Barcelona concentran el {pct(madrid + barcelona, stats.agencies)} % del directorio.
+            {aggregates.byCity.find((c) => c.key === "Not listed")?.value ?? 0} agencias no tienen ciudad registrada.
+          </p>
+        </div>
+      </section>
+
+      <section class="card col-8 reveal" aria-labelledby="pulse-title">
+        <div class="card-head">
+          <div>
+            <p class="card-kicker">Impulso · menciones diarias</p>
+            <h3 class="card-title" id="pulse-title">Cobertura en prensa sectorial</h3>
+          </div>
+          <span class="card-meta">01 OCT — 20 NOV 2026</span>
+        </div>
+        <div class="card-body">
+          <PulseChart days={aggregates.newsByDay} />
+          <p class="note" style="margin-top:6px">
+            <Icon name="info" />
+            {pulseTotal} de {stats.news} noticias caen dentro de esta ventana de {pulseDays} días: el feed es una
+            muestra reciente, no un archivo completo.
+          </p>
+        </div>
+      </section>
+
+      <section class="card col-4 reveal" aria-labelledby="latest-title">
+        <div class="card-head">
+          <div>
+            <p class="card-kicker">Actualidad</p>
+            <h3 class="card-title" id="latest-title">Últimas noticias</h3>
+          </div>
+          <a class="card-link" href="/noticias/">TODAS <Icon name="arrow" size={10} /></a>
+        </div>
+        <div class="card-body card-body--tight">
+          <ul class="dispatch-list">
+            {aggregates.latestNews.slice(0, 5).map((n) => {
+              const d = dateParts(n.publishedAt);
+              const cat = categoryMeta(n.category);
+              return (
+                <li>
+                  <a class="dispatch" href={`/noticias/#n-${n.id}`}>
+                    <span class="dispatch-date"><b>{d.day}</b>{d.month}</span>
+                    <span>
+                      <span class="dispatch-title">{n.title}</span>
+                      <span class="dispatch-meta">
+                        <span class="cat" style={`--cat:${cat.color}`}>{cat.label}</span>
+                        <span>·</span>
+                        <span>{sourceLabel(n.source)}</span>
+                      </span>
+                    </span>
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </section>
+
+      <section class="card col-7 reveal" aria-labelledby="connected-title">
+        <div class="card-head">
+          <div>
+            <p class="card-kicker">Red</p>
+            <h3 class="card-title" id="connected-title">Agencias más conectadas</h3>
+          </div>
+          <span class="card-meta">PERSONAS + CLIENTES + NOTICIAS</span>
+        </div>
+        <div class="card-body" style="padding-top:8px">
+          <table class="connected">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Agencia</th>
+                <th>Personas</th>
+                <th>Clientes</th>
+                <th>Noticias</th>
+                <th>Puntos</th>
+              </tr>
+            </thead>
+            <tbody>
+              {aggregates.topConnected.map((a, i) => (
+                <tr>
+                  <td class="rank">{String(i + 1).padStart(2, "0")}</td>
+                  <td class="who">
+                    <a href={`/agencias/${a.slug}/`}>
+                      <i class="classline" style={`--c:${classMeta(a.classification).color}`}></i>
+                      <span>
+                        {a.name}
+                        <small>{classMeta(a.classification).label} · {a.city ?? "España"}</small>
+                      </span>
+                    </a>
+                  </td>
+                  <td class="metric">{a.people}</td>
+                  <td class="metric">{a.clients}</td>
+                  <td class="metric">{a.news}</td>
+                  <td class="metric metric--score"><span>{a.score}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card col-5 reveal" aria-labelledby="press-title">
+        <div class="card-head">
+          <div>
+            <p class="card-kicker">Fuentes</p>
+            <h3 class="card-title" id="press-title">Quién cubre el mercado</h3>
+          </div>
+          <span class="card-meta">{stats.news} NOTICIAS · {stats.sources} MEDIOS</span>
+        </div>
+        <div class="card-body">
+          <BarList items={pressItems} showShare />
+          <div class="mini-rule"></div>
+          <p class="note">
+            <Icon name="news" />
+            {sourceLabel(aggregates.bySource[0]?.key ?? "")} y {sourceLabel(aggregates.bySource[1]?.key ?? "")}
+            concentran el {pct(topPress, stats.news)} % de la cobertura.
+          </p>
+        </div>
+      </section>
+
+      <section class="card col-4 reveal" aria-labelledby="categories-title">
+        <div class="card-head">
+          <div>
+            <p class="card-kicker">Editorial</p>
+            <h3 class="card-title" id="categories-title">De qué se habla</h3>
+          </div>
+          <span class="card-meta">{stats.news} NOTICIAS</span>
+        </div>
+        <div class="card-body">
+          <BarList items={categoryItems} showShare />
+          <div class="mini-rule"></div>
+          <p class="note">
+            <Icon name="info" />
+            Los nombramientos dominan: el {pct(aggregates.byCategory[0]?.value ?? 0, stats.news)} % de las noticias son cambios de personas.
+          </p>
+        </div>
+      </section>
+
+      <section class="card col-4 reveal" aria-labelledby="talent-title">
+        <div class="card-head">
+          <div>
+            <p class="card-kicker">Talento</p>
+            <h3 class="card-title" id="talent-title">Fundadores y directores</h3>
+          </div>
+          <span class="card-meta">{stats.agencyPeopleLinks} VÍNCULOS</span>
+        </div>
+        <div class="card-body">
+          <div class="talent-stats">
+            <div class="pulse-stat"><span>Personas</span><b>{stats.people}</b></div>
+            <div class="pulse-stat"><span>Vínculos de rol</span><b>{stats.agencyPeopleLinks}</b></div>
+            <div class="pulse-stat"><span>Fundadores</span><b>{founderLinks}</b></div>
+          </div>
+          <div class="stack-bar" aria-hidden="true">
+            <i style={`width:${(directorLinks / stats.agencyPeopleLinks) * 100}%;--c:#5cc8ff`} data-tip={`Directores · ${directorLinks}`}></i>
+            <i style={`width:${(founderLinks / stats.agencyPeopleLinks) * 100}%;--c:#c9f158`} data-tip={`Fundadores · ${founderLinks}`}></i>
+          </div>
+          <div class="ownership-list">
+            <div class="ownership-row"><i class="legend-dot" style="--c:#5cc8ff"></i><span class="legend-label">Roles de dirección</span><span class="legend-count">{directorLinks}</span></div>
+            <div class="ownership-row"><i class="legend-dot" style="--c:#c9f158"></i><span class="legend-label">Roles de fundador</span><span class="legend-count">{founderLinks}</span></div>
+            {roleItems.slice(2).map((r) => (
+              <div class="ownership-row"><i class="legend-dot" style="--c:#313848"></i><span class="legend-label">{r.key}</span><span class="legend-count">{r.value}</span></div>
+            ))}
+          </div>
+          <div class="mini-rule"></div>
+          <a class="card-link" href="/personas/">Abrir el directorio de personas <Icon name="arrow" size={10} /></a>
+        </div>
+      </section>
+
+      <section class="card col-4 reveal" aria-labelledby="quality-title">
+        <div class="card-head">
+          <div>
+            <p class="card-kicker">Procedencia</p>
+            <h3 class="card-title" id="quality-title">Qué sabe la base de datos</h3>
+          </div>
+          <span class="card-meta">TASA DE RELLENO</span>
+        </div>
+        <div class="card-body">
+          <div class="quality-list">
+            {qualityItems.map((q) => (
+              <div class="quality-row">
+                <span class="quality-label">{q.label}</span>
+                <span class="quality-value"><b>{q.pctValue}%</b> {q.fill}/{q.total}</span>
+                <span class="quality-track"><span class="quality-fill" style={`--w:${q.pctValue}%;--c:${q.color}`}></span></span>
+              </div>
+            ))}
+          </div>
+          <div class="mini-rule"></div>
+          <p class="note">
+            <Icon name="info" />
+            Las descripciones y las webs están completas. Los datos financieros y la plantilla son casi
+            inexistentes: trata el catálogo como editorial, no auditado.
+          </p>
+        </div>
+      </section>
+    </div>
+
+    <section class="cta reveal">
+      <div>
+        <span class="eyebrow"><span class="dot"></span>Más a fondo</span>
+        <h2 style="margin-top:12px">Explora todo el <em>atlas</em>.</h2>
+        <p>
+          Cada agencia tiene su propia ficha: liderazgo, cartera de clientes, historial de cobertura y fuentes.
+          O empieza por las personas y las marcas que hay detrás.
+        </p>
+      </div>
+      <div class="cta-actions">
+        <a class="btn btn--primary" href="/agencias/">Ver agencias <Icon name="arrow" /></a>
+        <a class="btn btn--ghost" href="/noticias/">Leer la actualidad</a>
+      </div>
+    </section>
+  </div>
+</Base>

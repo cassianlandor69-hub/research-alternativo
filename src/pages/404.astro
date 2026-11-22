@@ -1,0 +1,26 @@
+---
+import Base from "../layouts/Base.astro";
+import Icon from "../components/ui/Icon.astro";
+---
+<Base
+  title="Página no encontrada — Agency Atlas"
+  description="Esa página no forma parte del atlas. Explora agencias, personas, clientes o la actualidad sectorial."
+  active="none"
+>
+  <div class="container">
+    <div style="min-height:62vh;display:grid;place-items:center;text-align:center;padding:60px 0">
+      <div style="max-width:560px">
+        <p class="eyebrow" style="justify-content:center"><span class="dot"></span>Error 404</p>
+        <h1 class="page-title" style="margin-top:18px">Perdido en el <em>atlas</em>.</h1>
+        <p class="page-lede" style="margin-inline:auto">
+          Esa ruta no existe, o la agencia ha cambiado de nombre. Prueba el directorio, las personas que hay detrás
+          o la actualidad sectorial.
+        </p>
+        <div class="hero-actions" style="justify-content:center">
+          <a class="btn btn--primary" href="/agencias/">Ver agencias <Icon name="arrow" /></a>
+          <a class="btn btn--ghost" href="/">Volver al resumen</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</Base>

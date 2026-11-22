@@ -1,0 +1,54 @@
+---
+import { NAV } from "../lib/data";
+interface Props {
+  active: string;
+}
+const { active } = Astro.props;
+---
+<header class="site-header" data-header>
+  <div class="container header-inner">
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round">
+          <path d="M12 2.8v18.4M2.8 12h18.4M5.5 5.5l13 13M18.5 5.5l-13 13" />
+        </svg>
+      </span>
+      <span class="brand-word"><b>AGENCY</b><span>/</span><b>ATLAS</b></span>
+      <span class="brand-tag">ES</span>
+    </a>
+
+    <nav class="nav" aria-label="Principal">
+      {NAV.map((item) => (
+        <a class="nav-link" href={item.href} aria-current={active === item.key ? "page" : undefined}>
+          {item.label}
+        </a>
+      ))}
+    </nav>
+
+    <div class="header-actions">
+      <button class="search-trigger" type="button" data-search-open aria-label="Buscar ⌘K">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3.6-3.6" stroke-linecap="round" />
+        </svg>
+        <span>Buscar</span>
+        <kbd>⌘K</kbd>
+      </button>
+      <button class="icon-btn" type="button" data-nav-toggle aria-expanded="false" aria-controls="mobile-nav" aria-label="Abrir menú">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <path d="M3 6h18M3 12h18M3 18h18" />
+        </svg>
+      </button>
+    </div>
+  </div>
+  <div class="mobile-nav" id="mobile-nav" data-mobile-nav>
+    <div class="container">
+      {NAV.map((item) => (
+        <a href={item.href} aria-current={active === item.key ? "page" : undefined}>
+          {item.label}
+          <span aria-hidden="true">→</span>
+        </a>
+      ))}
+    </div>
+  </div>
+</header>

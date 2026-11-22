@@ -1,0 +1,66 @@
+---
+interface Segment {
+  label: string;
+  value: number;
+  color: string;
+}
+interface Props {
+  segments: Segment[];
+  total: number;
+  centerLabel?: string;
+  legend?: boolean;
+  size?: number;
+}
+const { segments, total, centerLabel = "agencies", legend = true, size = 176 } = Astro.props;
+const visible = segments.filter((s) => s.value > 0);
+let cursor = 0;
+const arcs = visible.map((s) => {
+  const share = (s.value / total) * 100;
+  const length = Math.max(share - 1, 0.25);
+  const arc = { ...s, share, length, offset: -cursor };
+  cursor += share;
+  return arc;
+});
+const aria = visible.map((s) => `${s.label}: ${s.value}`).join(", ");
+---
+<div class="donut-wrap" data-donut>
+  <div class="donut-box" style={`width:${size}px;height:${size}px`}>
+    <svg class="donut-svg" viewBox="0 0 200 200" role="img" aria-label={`Distribución — ${aria}`}>
+      <circle cx="100" cy="100" r="80" fill="none" stroke="rgba(255,255,255,0.045)" stroke-width="17" />
+      {arcs.map((s) => (
+        <circle
+          class="donut-seg"
+          data-segment={s.label}
+          cx="100"
+          cy="100"
+          r="80"
+          fill="none"
+          stroke={s.color}
+          stroke-width="17"
+          pathLength="100"
+          stroke-dasharray={`${s.length} ${100 - s.length}`}
+          stroke-dashoffset={s.offset}
+          opacity="0.92"
+        >
+          <title>{s.label}: {s.value}</title>
+        </circle>
+      ))}
+    </svg>
+    <div class="donut-center">
+      <b>{total}</b>
+      <span>{centerLabel}</span>
+    </div>
+  </div>
+  {legend && (
+    <div class="legend">
+      {arcs.map((s) => (
+        <div class="legend-row" data-legend-key={s.label}>
+          <i class="legend-dot" style={`--c:${s.color}`} />
+          <span class="legend-label">{s.label}</span>
+          <span class="legend-count">{s.value}</span>
+          <span class="legend-pct">{Math.round(s.share)}%</span>
+        </div>
+      ))}
+    </div>
+  )}
+</div>

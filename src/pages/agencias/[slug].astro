@@ -1,0 +1,269 @@
+---
+import Base from "../../layouts/Base.astro";
+import Icon from "../../components/ui/Icon.astro";
+import Badge from "../../components/ui/Badge.astro";
+import {
+  data,
+  classMeta,
+  CLASS_META,
+  categoryMeta,
+  sourceLabel,
+  fmtDate,
+  dateParts,
+  hostname,
+  initials,
+  avatarStyle,
+  pct,
+} from "../../lib/data";
+import type { Agency } from "../../lib/types";
+
+export function getStaticPaths() {
+  return data.agencies.map((agency) => ({ params: { slug: agency.slug }, props: { agency } }));
+}
+
+interface Props {
+  agency: Agency;
+}
+const { agency: a } = Astro.props;
+const idx = data.agencies.findIndex((x) => x.slug === a.slug);
+const prev = idx > 0 ? data.agencies[idx - 1] : data.agencies[data.agencies.length - 1];
+const next = idx < data.agencies.length - 1 ? data.agencies[idx + 1] : data.agencies[0];
+const cls = classMeta(a.classification);
+const latest = a.news[0];
+const confidence = a.confidence ?? 0;
+
+const tagLabel = (tag: string) =>
+  CLASS_META[tag]?.label ??
+  (tag === "independent" ? "Independiente" : tag.replaceAll("_", " ").replace(/^./, (c) => c.toUpperCase()));
+
+const statusLabel =
+  a.status === "active" ? "Activa" : a.status === "merged" ? "Fusionada" : a.status === "closed" ? "Cerrada" : a.status;
+
+const description =
+  a.description?.slice(0, 155) ??
+  `${a.name} — agencia${a.city ? ` en ${a.city}` : ""} registrada en Agency Atlas.`;
+---
+<Base title={`${a.name} — Agency Atlas`} description={description} active="agencies">
+  <div class="container">
+    <div style="padding-top:28px">
+      <nav class="breadcrumb" aria-label="Migas de pan">
+        <a href="/agencias/">Agencias</a>
+        <span class="sep">/</span>
+        <span class="current">{a.name}</span>
+      </nav>
+    </div>
+
+    <header class="detail-head">
+      <div class="detail-title-row">
+        <span class="avatar avatar--lg" style={avatarStyle(a.name)} aria-hidden="true">{initials(a.name)}</span>
+        <div style="min-width:0">
+          <h1 class="detail-title">{a.name}</h1>
+          {a.aliases.length > 0 && (
+            <p class="mono" style="margin-top:9px;font-size:10px;letter-spacing:0.06em;color:var(--dim)">
+              TAMBIÉN: {a.aliases.join(" · ").toUpperCase()}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div class="detail-badges">
+        <Badge label={cls.label} color={cls.color} />
+        <Badge label={statusLabel} color={a.status === "active" ? "#4ade80" : "#ffb454"} variant="plain" />
+        {a.groupName ? (
+          <Badge label={a.groupName} color="#a7b0c0" variant="plain" />
+        ) : (
+          <Badge label="Independiente" color="#c9f158" variant="plain" />
+        )}
+        {a.city && <Badge label={a.city} color="#a7b0c0" variant="plain" />}
+      </div>
+
+      {a.description && <p class="detail-desc">{a.description}</p>}
+
+      <div class="detail-facts">
+        {a.url && (
+          <span>
+            <Icon name="link" />
+            <a href={a.url} target="_blank" rel="noopener noreferrer">{hostname(a.url)}</a>
+          </span>
+        )}
+        {a.city && <span><Icon name="pin" />{a.city}, {a.country ?? "España"}</span>}
+        {a.foundedYear && <span><Icon name="calendar" />Fundada en {a.foundedYear}</span>}
+        {a.counts.sources > 0 && <span><Icon name="database" />{a.counts.sources} {a.counts.sources === 1 ? "fuente" : "fuentes"}</span>}
+        <span><Icon name="clock" />Actualizada {fmtDate(a.updatedAt.slice(0, 10))}</span>
+        {latest && <span><Icon name="news" />Última noticia {fmtDate(latest.publishedAt)}</span>}
+      </div>
+    </header>
+
+    <div class="detail-layout">
+      <div class="detail-content">
+        {a.news.length > 0 && (
+          <section class="detail-section">
+            <div class="detail-section-head">
+              <h2>Cobertura</h2>
+              <span>{a.news.length} {a.news.length === 1 ? "noticia" : "noticias"}</span>
+            </div>
+            <div>
+              {a.news.map((n) => {
+                const d = dateParts(n.publishedAt);
+                const cat = categoryMeta(n.category);
+                return (
+                  <article class="news-item" id={`n-${n.id}`}>
+                    <div class="news-date"><b>{d.day}</b>{d.month} {d.year}</div>
+                    <div>
+                      <a class="news-title" href={`/noticias/#n-${n.id}`}>{n.title}</a>
+                      {n.summary && <p class="news-summary">{n.summary}</p>}
+                      <div class="news-meta">
+                        <span class="badge" style={`--badge:${cat.color}`}>{cat.label}</span>
+                        <a class="news-source" href={n.url} target="_blank" rel="noopener noreferrer">{sourceLabel(n.source)}</a>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        <section class="detail-section">
+          <div class="detail-section-head">
+            <h2>Liderazgo</h2>
+            <span>{a.people.length} {a.people.length === 1 ? "persona" : "personas"}</span>
+          </div>
+          {a.people.length > 0 ? (
+            <div class="people-list">
+              {a.people.map((p) => (
+                <a class="mini-person" href={`/personas/#p-${p.id}`}>
+                  <span class="avatar" style={avatarStyle(p.name)} aria-hidden="true">{initials(p.name)}</span>
+                  <span style="min-width:0">
+                    <span class="name">{p.name}</span>
+                    <span class="role">{p.role}</span>
+                  </span>
+                </a>
+              ))}
+            </div>
+          ) : (
+            <p class="note"><Icon name="info" />Aún no hay liderazgo registrado para esta agencia.</p>
+          )}
+        </section>
+
+        <section class="detail-section">
+          <div class="detail-section-head">
+            <h2>Clientes</h2>
+            <span>{a.clients.length} {a.clients.length === 1 ? "marca" : "marcas"}</span>
+          </div>
+          {a.clients.length > 0 ? (
+            <div class="client-chips">
+              {a.clients.map((c) => (
+                <a class="chip chip--dot" style="--chip-color:#c9f158" href={`/clientes/#c-${c.id}`}>{c.name}</a>
+              ))}
+            </div>
+          ) : (
+            <p class="note"><Icon name="info" />No hay cartera de clientes registrada para esta agencia.</p>
+          )}
+        </section>
+      </div>
+
+      <aside class="detail-aside">
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <p class="card-kicker">Ficha</p>
+              <h2 class="card-title">De un vistazo</h2>
+            </div>
+            <span class="card-meta">#{String(a.id).padStart(3, "0")}</span>
+          </div>
+          <div class="card-body">
+            <div class="detail-stats">
+              <div class="detail-stat"><b>{a.counts.people}</b><span>Personas</span></div>
+              <div class="detail-stat"><b>{a.counts.clients}</b><span>Clientes</span></div>
+              <div class="detail-stat"><b>{a.counts.news}</b><span>Noticias</span></div>
+            </div>
+            <dl class="kv">
+              <div class="kv-row"><dt>Práctica</dt><dd>{cls.label}</dd></div>
+              <div class="kv-row"><dt>Propiedad</dt><dd>{a.groupName ?? "Independiente"}</dd></div>
+              <div class="kv-row"><dt>Ciudad</dt><dd>{a.city ?? "Sin ciudad"}</dd></div>
+              {a.legalName && <div class="kv-row"><dt>Razón social</dt><dd>{a.legalName}</dd></div>}
+              {a.foundedYear && <div class="kv-row"><dt>Fundada</dt><dd>{a.foundedYear}</dd></div>}
+              <div class="kv-row"><dt>Estado</dt><dd>{statusLabel}</dd></div>
+              <div class="kv-row">
+                <dt>Confianza</dt>
+                <dd style="min-width:110px">
+                  <div class="meter">
+                    <span class="meter-track"><span class="meter-fill" style={`--w:${pct(confidence, 1)}%`}></span></span>
+                    <span>{Math.round(confidence * 100)}%</span>
+                  </div>
+                </dd>
+              </div>
+              <div class="kv-row"><dt>Primera vez</dt><dd>{fmtDate(a.createdAt.slice(0, 10))}</dd></div>
+              <div class="kv-row"><dt>Actualizada</dt><dd>{fmtDate(a.updatedAt.slice(0, 10))}</dd></div>
+              {a.counts.founders > 0 && <div class="kv-row"><dt>Fundadores</dt><dd>{a.counts.founders}</dd></div>}
+            </dl>
+          </div>
+        </div>
+
+        {a.clout && (
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <p class="card-kicker">Reputación</p>
+                <h2 class="card-title">Reconocimiento y premios</h2>
+              </div>
+            </div>
+            <div class="card-body">
+              <p class="clout">{a.clout}</p>
+            </div>
+          </div>
+        )}
+
+        {a.sources.length > 0 && (
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <p class="card-kicker">Procedencia</p>
+                <h2 class="card-title">Fuentes</h2>
+              </div>
+              <span class="card-meta">{a.counts.sources}</span>
+            </div>
+            <div class="card-body">
+              <div class="sources-list">
+                {a.sources.map((s) => (
+                  <a href={s} target="_blank" rel="noopener noreferrer">
+                    <Icon name="external" />
+                    <span>{hostname(s)}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {a.tags.length > 0 && (
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <p class="card-kicker">Etiquetas</p>
+                <h2 class="card-title">Etiquetas de clasificación</h2>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="client-chips">
+                {a.tags.map((t) => <span class="chip">{tagLabel(t)}</span>)}
+              </div>
+            </div>
+          </div>
+        )}
+      </aside>
+    </div>
+
+    <nav class="detail-nav" aria-label="Navegación entre agencias">
+      <a href={`/agencias/${prev.slug}/`}>
+        <small>← Anterior</small>
+        {prev.name}
+      </a>
+      <a class="next" href={`/agencias/${next.slug}/`}>
+        <small>Siguiente →</small>
+        {next.name}
+      </a>
+    </nav>
+  </div>
+</Base>

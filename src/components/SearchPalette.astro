@@ -1,0 +1,61 @@
+---
+import { data } from "../lib/data";
+const { stats } = data;
+---
+<dialog class="search-dialog" data-search-dialog aria-label="Buscar agencias, personas, clientes y noticias">
+  <div class="search-input-row">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.6-3.6" stroke-linecap="round" />
+    </svg>
+    <input
+      type="search"
+      name="q"
+      placeholder={`Buscar ${stats.agencies} agencias, ${stats.people} personas, ${stats.clients} clientes, ${stats.news} noticias…`}
+      autocomplete="off"
+      spellcheck="false"
+      aria-label="Consulta de búsqueda"
+      data-search-input
+    />
+    <kbd class="kbd">esc</kbd>
+  </div>
+  <div class="search-body" data-search-body>
+    <p class="search-section-label">Ir a</p>
+    <button class="search-result" type="button" data-href="/agencias/">
+      <span class="ico" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21V7l8-4 8 4v14M9 21v-6h6v6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+      </span>
+      <span class="txt"><span class="name">Todas las agencias</span><span class="sub">Directorio · filtros y orden</span></span>
+      <span class="go">INTRO</span>
+    </button>
+    <button class="search-result" type="button" data-href="/personas/">
+      <span class="ico" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6" stroke-linecap="round" /></svg>
+      </span>
+      <span class="txt"><span class="name">Directorio de personas</span><span class="sub">Fundadores, directores y socios</span></span>
+      <span class="go">INTRO</span>
+    </button>
+    <button class="search-result" type="button" data-href="/clientes/">
+      <span class="ico" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18v13H3zM8 7V4h8v3" stroke-linecap="round" stroke-linejoin="round" /></svg>
+      </span>
+      <span class="txt"><span class="name">Cartera de clientes</span><span class="sub">Marcas y sus agencias</span></span>
+      <span class="go">INTRO</span>
+    </button>
+    <button class="search-result" type="button" data-href="/noticias/">
+      <span class="ico" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4h14v16H5zM9 8h6M9 12h6M9 16h4" stroke-linecap="round" /></svg>
+      </span>
+      <span class="txt"><span class="name">Actualidad</span><span class="sub">Cobertura de la prensa sectorial</span></span>
+      <span class="go">INTRO</span>
+    </button>
+    <p class="search-section-label">Sugerencia</p>
+    <p class="search-empty" style="padding:8px 10px;text-align:left">
+      Prueba con “Havas”, “Coca-Cola”, “Barcelona”, “concurso” o “fundador”.
+    </p>
+  </div>
+  <div class="search-foot">
+    <span><kbd class="kbd">↑</kbd> <kbd class="kbd">↓</kbd> navegar · <kbd class="kbd">intro</kbd> abrir</span>
+    <span>{stats.agencies} agencias indexadas</span>
+  </div>
+</dialog>

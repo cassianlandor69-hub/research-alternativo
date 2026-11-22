@@ -1,0 +1,452 @@
+---
+import { statSync } from "node:fs";
+import { join } from "node:path";
+import Base from "../layouts/Base.astro";
+import Icon from "../components/ui/Icon.astro";
+import Badge from "../components/ui/Badge.astro";
+import { data, fmtDate, fmtNum, pct } from "../lib/data";
+
+const { stats, aggregates, database, ingest, agencies, clients, news } = data;
+
+const fileSize = (relative: string) => {
+  try {
+    const bytes = statSync(join(process.cwd(), "public", relative)).size;
+    return bytes > 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`;
+  } catch {
+    return "—";
+  }
+};
+
+const tableOrder = [
+  "agencies",
+  "people",
+  "agency_people",
+  "clients",
+  "agency_clients",
+  "news",
+  "agency_news",
+  "ingest_runs",
+  "meta",
+];
+const tableNotes: Record<string, string> = {
+  agencies: "Registros canónicos de agencia: identidad, práctica, propiedad, ciudad, descripción y procedencia.",
+  people: "Personas únicas, normalizadas por nombre.",
+  agency_people: "Vínculos de rol entre personas y agencias: fundadores y directores.",
+  clients: "Marcas cliente, únicas por nombre normalizado.",
+  agency_clients: "Relaciones agencia ↔ cliente, con indicador de relevancia y año de inicio opcional.",
+  news: "Artículos de prensa sectorial, una fila por hash de URL.",
+  agency_news: "Vínculos de mención entre noticias y las agencias que nombran.",
+  ingest_runs: "Registro de auditoría de los lotes de siembra, diarios y enriquecimiento.",
+  meta: "Almacén clave/valor; actualmente solo la versión del esquema.",
+};
+
+const KIND_LABELS: Record<string, string> = { seed: "Inicial", daily: "Diaria", enrich: "Enriquecimiento" };
+const MODE_LABELS: Record<string, string> = { manual: "Manual", prompt: "Asistida", automation: "Automática" };
+const SUMMARY_LABELS: Record<string, string> = {
+  "seeded 128 agencies": "Sembrado inicial: 128 agencias",
+  "agency upsert": "Alta o actualización de agencia",
+  "agency upsert (guarded)": "Alta o actualización de agencia (protegida)",
+};
+const STAT_LABELS: Record<string, string> = {
+  agencies: "agencias",
+  errors: "errores",
+  people: "personas",
+  clients: "clientes",
+  rejected: "rechazadas",
+  news: "noticias",
+};
+const tables = [...database.tables].sort(
+  (a, b) => tableOrder.indexOf(a.name) - tableOrder.indexOf(b.name),
+);
+const relations = tables.flatMap((t) =>
+  t.columns
+    .filter((c) => c.references)
+    .map((c) => ({ from: t.name, column: c.name, to: c.references as string })),
+);
+
+const coverageRows = [
+  { label: "Al menos una persona", fill: aggregates.coverage.people, color: "#c9f158" },
+  { label: "Al menos un cliente", fill: aggregates.coverage.clients, color: "#5cc8ff" },
+  { label: "Al menos una noticia", fill: aggregates.coverage.news, color: "#b79cff" },
+  { label: "Una ciudad registrada", fill: agencies.filter((a) => a.city).length, color: "#ffb454" },
+  { label: "Un grupo declarado", fill: database.groupNamePresent, color: "#ff8fb1" },
+];
+
+const cityMissing = agencies.filter((a) => !a.city).length;
+const noNews = stats.agencies - aggregates.coverage.news;
+const noPeople = stats.agencies - aggregates.coverage.people;
+const noClients = stats.agencies - aggregates.coverage.clients;
+const groupLabels = new Set(agencies.map((a) => a.groupName).filter(Boolean)).size;
+const statuses = new Set(agencies.map((a) => a.status));
+const confidenceValues = new Set(agencies.map((a) => a.confidence));
+const sectorMissing = clients.every((c) => !c.sector);
+const sentimentMissing = news.every((n) => !n.sentiment);
+const tagsEmpty = agencies.filter((a) => a.tags.length === 0).length;
+
+const renderStats = (raw: Record<string, unknown> | null) => {
+  if (!raw) return "—";
+  const entries = Object.entries(raw).filter(([, v]) => typeof v !== "object");
+  return entries.length ? entries.map(([k, v]) => `${v} ${STAT_LABELS[k] ?? k}`).join(" · ") : "—";
+};
+
+const statusList = [...statuses].map((s) => (s === "active" ? "activo" : s)).join(", ");
+const confidenceList = [...confidenceValues].map((v) => v?.toLocaleString("es-ES") ?? "—").join(", ");
+
+const jsonSize = fileSize("dataset.json");
+const dbSize = fileSize("agencies.db");
+const searches = fileSize("search.json");
+---
+<Base
+  title="Datos y esquema — Agency Atlas"
+  description="El esquema completo detrás de Agency Atlas: 9 tablas SQLite, una vista precalculada, completitud de campos, carencias conocidas y el registro de ingesta."
+  active="data"
+>
+  <div class="container">
+    <section class="page-head">
+      <p class="eyebrow"><span class="dot dot--violet"></span>Bajo el capó · esquema v{database.meta.schema_version}</p>
+      <h1 class="page-title">La base de datos, <em>al descubierto</em>.</h1>
+      <p class="page-lede">
+        <span class="mono">agencies.db</span> es un único archivo SQLite: {database.tables.length} tablas,
+        {database.views.length} vista y {database.indexes.length} índices. Este sitio se genera a partir de él en la
+        compilación: cada página, ficha y descarga JSON es estática. Aquí está exactamente qué contiene la base de
+        datos y por dónde flaquea.
+      </p>
+      <div class="page-stats">
+        <span class="page-stat"><b>{database.tables.length}</b> tablas</span>
+        <span class="page-stat"><b>{database.views.length}</b> vista</span>
+        <span class="page-stat"><b>{database.indexes.length}</b> índices</span>
+        <span class="page-stat"><b>{fmtNum(database.tables.reduce((acc, t) => acc + t.rowCount, 0))}</b> filas</span>
+        <span class="page-stat"><b>{ingest.total}</b> ejecuciones de ingesta</span>
+        <span class="page-stat"><b>{fmtDate(data.generatedAt.slice(0, 10))}</b> foto de compilación</span>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow"><span class="dot"></span>Esquema</span>
+          <h2 class="section-title" style="margin-top:9px">Nueve tablas, un mercado</h2>
+          <p class="section-desc">
+            Las agencias y las personas son entidades; los clientes y las noticias se registran mediante tablas
+            de unión. Todas las tablas tienen clave primaria entera y claves foráneas declaradas.
+          </p>
+        </div>
+        <a class="section-link" href="#relations">Relaciones <Icon name="arrow" size={12} /></a>
+      </div>
+
+      <div class="data-grid">
+        {tables.map((t) => (
+          <section class="card schema-card" id={`table-${t.name}`}>
+            <div class="card-head">
+              <div>
+                <p class="card-kicker">{t.name === "meta" ? "Metadatos" : t.name === "ingest_runs" ? "Auditoría" : "Tabla"}</p>
+                <h3 class="card-title mono" style="font-size:13px">{t.name}</h3>
+              </div>
+              <span class="table-count"><b>{fmtNum(t.rowCount)}</b> filas</span>
+            </div>
+            <div class="card-body">
+              <p class="note" style="margin-bottom:12px;color:var(--dim)">{tableNotes[t.name]}</p>
+              <table class="schema-table">
+                <thead>
+                  <tr><th>Columna</th><th>Tipo</th><th>Clave</th><th>→</th></tr>
+                </thead>
+                <tbody>
+                  {t.columns.map((c) => (
+                    <tr>
+                      <td class="name">{c.name}</td>
+                      <td class="type">{c.type || "—"}</td>
+                      <td class="flags">{[c.pk ? "PK" : "", c.references ? "FK" : "", c.notNull && !c.pk ? "NN" : ""].filter(Boolean).join(" ")}</td>
+                      <td class="ref">{c.references ?? ""}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        ))}
+      </div>
+    </section>
+
+    <section class="section" id="relations">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow"><span class="dot dot--violet"></span>Relaciones</span>
+          <h2 class="section-title">Cómo se conectan los registros</h2>
+        </div>
+      </div>
+      <div class="grid-12">
+        <div class="card col-5">
+          <div class="card-head">
+            <div>
+              <p class="card-kicker">Claves foráneas</p>
+              <h3 class="card-title">Aristas</h3>
+            </div>
+            <span class="card-meta">{relations.length} RELACIONES</span>
+          </div>
+          <div class="card-body">
+            <div class="relations">
+              {relations.map((r) => (
+                <div class="relation-row">
+                  <b>{r.from}.{r.column}</b>
+                  <span class="arrow">→</span>
+                  <span>{r.to}.id</span>
+                  <span class="kind">muchos → uno</span>
+                </div>
+              ))}
+            </div>
+            <p class="note" style="margin-top:14px">
+              <Icon name="info" />
+              Las tablas de unión se borran en cascada: al eliminar una agencia también se eliminan sus vínculos con personas, clientes y noticias.
+            </p>
+          </div>
+        </div>
+
+        <div class="card col-3">
+          <div class="card-head">
+            <div>
+              <p class="card-kicker">Modelo de lectura</p>
+              <h3 class="card-title">La vista</h3>
+            </div>
+          </div>
+          <div class="card-body">
+            <p class="mono" style="font-size:11px;color:var(--lime)">{database.views[0]}</p>
+            <p class="note" style="margin-top:10px">
+              <Icon name="info" />
+              Precalcula los recuentos de fundadores, directores, clientes y noticias por agencia, además de la
+              fecha de la última noticia. El sitio deriva sus propios agregados de las tablas originales.
+            </p>
+            <div class="mini-rule"></div>
+            <dl class="kv">
+              <div class="kv-row"><dt>Fuente</dt><dd class="mono">agencies.db</dd></div>
+              <div class="kv-row"><dt>Versión</dt><dd class="mono">v{database.meta.schema_version}</dd></div>
+              <div class="kv-row"><dt>Motor</dt><dd class="mono">SQLite 3</dd></div>
+              <div class="kv-row"><dt>Tamaño</dt><dd class="mono">{dbSize}</dd></div>
+            </dl>
+          </div>
+        </div>
+
+        <div class="card col-4">
+          <div class="card-head">
+            <div>
+              <p class="card-kicker">Consultas de partida</p>
+              <h3 class="card-title">Explórala</h3>
+            </div>
+            <Icon name="code" size={14} class="dim" />
+          </div>
+          <div class="card-body">
+            <pre class="query"><code><b>SELECT</b> classification,
+       <b>COUNT</b>(*) <b>AS</b> n
+<b>FROM</b> agencies
+<b>GROUP BY</b> 1
+<b>ORDER BY</b> n <b>DESC</b>;</code></pre>
+            <pre class="query"><code><b>SELECT</b> a.name,
+       <b>COUNT</b>(*) <b>AS</b> clients
+<b>FROM</b> agencies a
+<b>JOIN</b> agency_clients ac
+  <b>ON</b> ac.agency_id = a.id
+<b>GROUP BY</b> a.id
+<b>ORDER BY</b> clients <b>DESC</b>
+<b>LIMIT</b> 10;</code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="quality">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow"><span class="dot dot--violet"></span>Calidad de datos</span>
+          <h2 class="section-title">Qué está completo y qué no</h2>
+          <p class="section-desc">
+            El catálogo es editorial, no auditado. Estas son las tasas de relleno que hay detrás de cada ficha,
+            mostradas tal cual, sin maquillar.
+          </p>
+        </div>
+      </div>
+      <div class="grid-12">
+        <div class="card col-6">
+          <div class="card-head">
+            <div>
+              <p class="card-kicker">Campos de agencia</p>
+              <h3 class="card-title">Completitud de campos</h3>
+            </div>
+            <span class="card-meta">{stats.agencies} AGENCIAS</span>
+          </div>
+          <div class="card-body">
+            <div class="quality-list">
+              {aggregates.quality.map((q) => {
+                const share = pct(q.fill, q.total);
+                const color = share >= 75 ? "#c9f158" : share >= 25 ? "#ffb454" : "#ff8fb1";
+                return (
+                  <div class="quality-row">
+                    <span class="quality-label">{q.label}<code>{q.field}</code></span>
+                    <span class="quality-value"><b>{share}%</b> {q.fill}/{q.total}</span>
+                    <span class="quality-track"><span class="quality-fill" style={`--w:${share}%;--c:${color}`}></span></span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div class="card col-6">
+          <div class="card-head">
+            <div>
+              <p class="card-kicker">Cobertura relacional</p>
+              <h3 class="card-title">Cuánto tiene cada agencia</h3>
+            </div>
+            <span class="card-meta">{stats.agencies} AGENCIAS</span>
+          </div>
+          <div class="card-body">
+            <div class="quality-list">
+              {coverageRows.map((row) => {
+                const share = pct(row.fill, stats.agencies);
+                return (
+                  <div class="quality-row">
+                    <span class="quality-label">{row.label}</span>
+                    <span class="quality-value"><b>{share}%</b> {row.fill}/{stats.agencies}</span>
+                    <span class="quality-track"><span class="quality-fill" style={`--w:${share}%;--c:${row.color}`}></span></span>
+                  </div>
+                );
+              })}
+            </div>
+            <div class="mini-rule"></div>
+            <p class="note">
+              <Icon name="info" />
+              {noPeople} agencias no tienen personas, {noClients} no tienen clientes y {noNews} no tienen noticias.
+              {cityMissing} no tienen ciudad.
+            </p>
+          </div>
+        </div>
+
+        <div class="card col-12">
+          <div class="card-head">
+            <div>
+              <p class="card-kicker">Advertencias</p>
+              <h3 class="card-title">Carencias conocidas de la fuente</h3>
+            </div>
+            <span class="card-meta">LEER ANTES DE CITAR</span>
+          </div>
+          <div class="card-body">
+            <div class="gap-list">
+              <div class="gap-row">
+                <Icon name="info" />
+                <span><b>Todos los registros están marcados como activos.</b> El estado es <span class="mono">{statusList}</span> para las {stats.agencies} agencias: no se representan agencias fusionadas, cerradas o históricas.</span>
+              </div>
+              <div class="gap-row">
+                <Icon name="info" />
+                <span><b>La confianza es uniforme.</b> Todas las agencias llevan <span class="mono">{confidenceList}</span>, así que la puntuación no permite ordenar fiabilidad. La procedencia está en el array <span class="mono">sources</span>.</span>
+              </div>
+              <div class="gap-row">
+                <Icon name="info" />
+                <span><b>Los datos financieros y la plantilla son prácticamente inexistentes.</b> {aggregates.coverage.foundedYear} agencias tienen año de fundación, {aggregates.coverage.employees} tienen empleados y {aggregates.coverage.revenue} registra ingresos.</span>
+              </div>
+              <div class="gap-row">
+                <Icon name="info" />
+                <span><b>Los campos editoriales son inconsistentes.</b> El sector del cliente está vacío en las {stats.clients} filas, el sentimiento de las noticias está vacío en las {stats.news} y {tagsEmpty} agencias no tienen etiquetas de clasificación.</span>
+              </div>
+              <div class="gap-row">
+                <Icon name="info" />
+                <span><b>Los nombres de grupo son texto libre.</b> {groupLabels} etiquetas distintas describen la propiedad (p. ej. “WPP”, “WPP / VML”, “Ogilvy / WPP”). Agency Atlas las normaliza en seis redes más «otros» en el panel.</span>
+              </div>
+              <div class="gap-row">
+                <Icon name="info" />
+                <span><b>La cobertura es una ventana reciente, no un archivo.</b> Las noticias van del {fmtDate(stats.newsRange.from)} al {fmtDate(stats.newsRange.to)}; la mayoría se concentra en octubre y noviembre de 2026, y se mantienen los duplicados entre medios.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="ingest">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow"><span class="dot"></span>Flujo de datos</span>
+          <h2 class="section-title">Registro de ingesta</h2>
+          <p class="section-desc">
+            {ingest.total} ejecuciones registradas. Cada lote escribe una fila de auditoría con tipo, modo y un JSON de estadísticas.
+          </p>
+        </div>
+        <span class="mono dim" style="font-size:10px">ÚLTIMA · #{ingest.latest?.id} · {fmtDate(ingest.latest?.startedAt?.slice(0, 10))}</span>
+      </div>
+      <div class="card">
+        <div class="card-body" style="overflow-x:auto">
+          <table class="runs-table">
+            <thead>
+              <tr><th>#</th><th>Tipo</th><th>Modo</th><th>Inicio</th><th>Fin</th><th>Resumen</th><th>Estadísticas</th></tr>
+            </thead>
+            <tbody>
+              {ingest.runs.map((r) => (
+                <tr>
+                  <td class="id">{String(r.id).padStart(2, "0")}</td>
+                  <td>
+                    <Badge
+                      label={KIND_LABELS[r.kind] ?? r.kind}
+                      color={r.kind === "enrich" ? "#5cc8ff" : r.kind === "daily" ? "#c9f158" : "#b79cff"}
+                      variant="plain"
+                    />
+                  </td>
+                  <td class="mono" style="font-size:10px">{r.mode ? MODE_LABELS[r.mode] ?? r.mode : "—"}</td>
+                  <td class="mono" style="font-size:10px">{fmtDate(r.startedAt.slice(0, 10))} <span class="dim">{r.startedAt.slice(11, 16)}</span></td>
+                  <td class="mono" style="font-size:10px">{r.finishedAt ? fmtDate(r.finishedAt.slice(0, 10)) : "—"}</td>
+                  <td>{r.summary ? SUMMARY_LABELS[r.summary] ?? r.summary : "—"}</td>
+                  <td class="mono" style="font-size:10px">{renderStats(r.stats)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="grid-12">
+        <div class="col-7">
+          <div class="download-card">
+            <span class="eyebrow"><span class="dot"></span>Datos abiertos</span>
+            <h3 style="margin-top:12px">Llévate el conjunto completo.</h3>
+            <p>
+              El dataset generado es un único archivo JSON con todas las agencias, personas, clientes y noticias ya
+              unidas. La base de datos SQLite original se incluye intacta.
+            </p>
+            <div class="hero-actions" style="margin-top:0">
+              <a class="btn btn--primary" href="/dataset.json" download>
+                <Icon name="download" /> dataset.json · {jsonSize}
+              </a>
+              <a class="btn btn--ghost" href="/agencies.db" download>
+                <Icon name="database" /> agencies.db · {dbSize}
+              </a>
+            </div>
+            <p class="mono" style="margin-top:14px;font-size:9px;color:var(--faint);letter-spacing:0.06em">
+              ÍNDICE DE BÚSQUEDA · {searches} · GENERADO {fmtDate(data.generatedAt.slice(0, 10))} · ESQUEMA v{database.meta.schema_version}
+            </p>
+          </div>
+        </div>
+        <div class="col-5">
+          <div class="card" style="height:100%">
+            <div class="card-head">
+              <div>
+                <p class="card-kicker">Compilación</p>
+                <h3 class="card-title">Cómo se hace este sitio</h3>
+              </div>
+            </div>
+            <div class="card-body">
+              <p class="note" style="margin-bottom:16px">
+                <Icon name="bolt" />
+                <span><span class="mono" style="color:var(--muted)">scripts/export-data.mjs</span> lee el archivo SQLite con el controlador integrado de Node, resuelve todas las relaciones y escribe un único JSON. Astro genera las páginas en la compilación.</span>
+              </p>
+              <dl class="kv">
+                <div class="kv-row"><dt>Tecnología</dt><dd class="mono">Astro 7 · estático</dd></div>
+                <div class="kv-row"><dt>Páginas</dt><dd class="mono">{stats.agencies + 6} rutas</dd></div>
+                <div class="kv-row"><dt>Perfiles de agencia</dt><dd class="mono">{stats.agencies}</dd></div>
+                <div class="kv-row"><dt>JavaScript en cliente</dt><dd class="mono">búsqueda + filtros</dd></div>
+                <div class="kv-row"><dt>Servidor</dt><dd class="mono" style="color:var(--lime)">ninguno</dd></div>
+              </dl>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</Base>

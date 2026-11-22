@@ -1,0 +1,193 @@
+---
+import Base from "../../layouts/Base.astro";
+import Icon from "../../components/ui/Icon.astro";
+import Badge from "../../components/ui/Badge.astro";
+import { data, classMeta } from "../../lib/data";
+
+const { stats, agencies, aggregates } = data;
+
+const slugifyToken = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+const cityValues = new Map<string, string>();
+const cityOptions = aggregates.byCity.map((c) => {
+  const value = c.key === "Not listed" ? "not-listed" : slugifyToken(c.key);
+  cityValues.set(c.key, value);
+  return { value, label: c.key === "Not listed" ? "Ciudad no registrada" : c.key, count: c.value };
+});
+
+const classCounts = new Map(aggregates.byClassification.map((c) => [c.key, c.value]));
+const networkCount = agencies.filter((a) => a.groupName).length;
+
+const searchText = (a: (typeof agencies)[number]) =>
+  [
+    a.name,
+    ...a.aliases,
+    a.description,
+    a.groupName,
+    a.city,
+    classMeta(a.classification).label,
+    ...a.tags,
+    ...a.clients.map((c) => c.name),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+---
+<Base
+  title="Agencias — Agency Atlas"
+  description={`Explora las ${stats.agencies} agencias españolas por práctica, propiedad y ciudad. Busca liderazgo, clientes y cobertura.`}
+  active="agencies"
+>
+  <div class="container">
+    <section class="page-head">
+      <p class="eyebrow"><span class="dot"></span>Directorio · {stats.agencies} registros</p>
+      <h1 class="page-title">El directorio de <em>agencias</em>.</h1>
+      <p class="page-lede">
+        Todas las agencias de la base de datos, desde estudios creativos independientes hasta agencias de medios
+        de red. Busca por nombre, cliente o grupo, filtra por práctica y abre una ficha con liderazgo, cobertura y fuentes.
+      </p>
+      <div class="page-stats">
+        <span class="page-stat"><b>{stats.agencies}</b> agencias</span>
+        <span class="page-stat"><b>{stats.classifications}</b> prácticas</span>
+        <span class="page-stat"><b>{stats.cities}</b> ciudades</span>
+        <span class="page-stat"><b>{networkCount}</b> con grupo</span>
+        <span class="page-stat"><b>{aggregates.coverage.people}</b> con personas</span>
+        <span class="page-stat"><b>{aggregates.coverage.news}</b> con cobertura</span>
+      </div>
+    </section>
+  </div>
+
+  <div data-explorer>
+    <div class="explorer-sticky">
+      <div class="container">
+        <div class="toolbar">
+          <label class="field">
+            <Icon name="search" />
+            <input
+              type="search"
+              data-filter-search
+              placeholder="Buscar nombre, cliente, grupo o descripción…"
+              aria-label="Buscar agencias"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </label>
+          <label class="select">
+            <select data-filter="city" aria-label="Filtrar por ciudad">
+              <option value="">Todas las ciudades</option>
+              {cityOptions.map((c) => <option value={c.value}>{c.label} ({c.count})</option>)}
+            </select>
+          </label>
+          <label class="select">
+            <select data-filter="group" aria-label="Filtrar por propiedad">
+              <option value="">Toda propiedad</option>
+              <option value="independent">Solo independientes</option>
+              <option value="network">Con grupo</option>
+            </select>
+          </label>
+          <label class="select">
+            <select data-sort aria-label="Ordenar agencias">
+              <option value="name" data-dir="asc">Nombre A–Z</option>
+              <option value="clients" data-dir="desc">Más clientes</option>
+              <option value="news" data-dir="desc">Más cobertura</option>
+              <option value="people" data-dir="desc">Más personas</option>
+              <option value="updated" data-dir="desc">Actualizadas recientemente</option>
+            </select>
+          </label>
+        </div>
+        <div class="filters" role="group" aria-label="Filtrar por práctica">
+          <button class="filter-chip" type="button" data-filter="class" data-value="all" aria-pressed="true">
+            Todas las prácticas <span class="n">{stats.agencies}</span>
+          </button>
+          {aggregates.byClassification.map((c) => (
+            <button class="filter-chip" type="button" data-filter="class" data-value={c.key} aria-pressed="false">
+              <span class="dot" style={`--c:${classMeta(c.key).color}`}></span>
+              {classMeta(c.key).label}
+              <span class="n">{classCounts.get(c.key)}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="results">
+        <div class="results-head">
+          <span class="results-label">Mostrando <b data-count>{stats.agencies}</b> de {stats.agencies} agencias</span>
+          <div class="results-tools">
+            <span class="results-label" aria-hidden="true">PERSONAS · CLIENTES · NOTICIAS</span>
+            <button class="reset-link" type="button" data-reset>Limpiar ×</button>
+          </div>
+        </div>
+
+        <div class="agency-head" aria-hidden="true">
+          <span>#</span>
+          <span>Agencia</span>
+          <span>Práctica</span>
+          <span>Grupo</span>
+          <span>Ciudad</span>
+          <span class="r">Personas</span>
+          <span class="r">Clientes</span>
+          <span class="r">Noticias</span>
+          <span></span>
+        </div>
+
+        <div data-items>
+          {agencies.map((a) => (
+            <a
+              class="agency-row"
+              href={`/agencias/${a.slug}/`}
+              id={a.slug}
+              data-item
+              data-search={searchText(a)}
+              data-class={a.classification}
+              data-city={a.city ? cityValues.get(a.city) ?? slugifyToken(a.city) : "not-listed"}
+              data-group={a.groupName ? "network" : "independent"}
+              data-sort-name={a.name.toLowerCase()}
+              data-sort-clients={a.counts.clients}
+              data-sort-news={a.counts.news}
+              data-sort-people={a.counts.people}
+              data-sort-updated={a.updatedAt.slice(0, 10)}
+            >
+              <span class="ar-index" aria-hidden="true">{String(a.index).padStart(2, "0")}</span>
+              <span class="ar-main">
+                <span class="ar-name"><span>{a.name}</span><Icon name="arrow" /></span>
+                <span class="ar-sub">
+                  {a.domain ?? "sin web"}
+                  {a.aliases.length > 0 && <> · también: {a.aliases.slice(0, 2).join(", ")}</>}
+                </span>
+              </span>
+              <span class="ar-class">
+                <Badge label={classMeta(a.classification).label} color={classMeta(a.classification).color} />
+              </span>
+              <span class="ar-group">{a.groupName ?? "Independiente"}</span>
+              <span class="ar-city">{a.city ?? "—"}</span>
+              <span class="ar-stats">
+                <span class:list={["ar-stat", "ar-people", { "is-zero": a.counts.people === 0 }]}>{a.counts.people}<span class="sr-only"> personas</span></span>
+                <span class:list={["ar-stat", "ar-clients", { "is-zero": a.counts.clients === 0 }]}>{a.counts.clients}<span class="sr-only"> clientes</span></span>
+                <span class:list={["ar-stat", "ar-news", { "is-zero": a.counts.news === 0 }]}>{a.counts.news}<span class="sr-only"> noticias</span></span>
+              </span>
+              <span class="ar-arrow" aria-hidden="true">→</span>
+            </a>
+          ))}
+        </div>
+
+        <div class="empty" data-empty>
+          <Icon name="search" size={26} />
+          <p>Ninguna agencia coincide con esos filtros.</p>
+          <button type="button" data-reset>Quitar todos los filtros</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    import "../../scripts/explorer.js";
+  </script>
+</Base>

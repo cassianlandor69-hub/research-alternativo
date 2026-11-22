@@ -1,0 +1,254 @@
+---
+import Base from "../layouts/Base.astro";
+import Icon from "../components/ui/Icon.astro";
+import BarList from "../components/charts/BarList.astro";
+import {
+  data,
+  classMeta,
+  categoryMeta,
+  sourceLabel,
+  fmtDate,
+  dateParts,
+  pct,
+} from "../lib/data";
+
+const { news, stats, aggregates, agencies } = data;
+const agencyBySlug = new Map(agencies.map((a) => [a.slug, a]));
+const topAgencies = new Map(
+  [...news.flatMap((n) => n.agencies)]
+    .reduce((map, a) => map.set(a.slug, (map.get(a.slug) ?? 0) + 1), new Map<string, number>())
+    .entries(),
+);
+const mostCovered = [...topAgencies.entries()]
+  .sort((a, b) => b[1] - a[1])
+  .slice(0, 6)
+  .map(([slug, count]) => ({ slug, name: agencyBySlug.get(slug)?.name ?? slug, count }));
+
+const sourceItems = aggregates.bySource.slice(0, 8).map((s) => ({
+  label: sourceLabel(s.key),
+  value: s.value,
+  color: "#c9f158",
+}));
+const categoryItems = aggregates.byCategory.map((c) => ({
+  label: categoryMeta(c.key).label,
+  value: c.value,
+  color: categoryMeta(c.key).color,
+}));
+
+const searchText = (n: (typeof news)[number]) =>
+  [n.title, n.summary, n.source, sourceLabel(n.source), n.category, categoryMeta(n.category).label, ...n.agencies.map((a) => a.name)]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+const appointments = aggregates.byCategory.find((c) => c.key === "appointment")?.value ?? 0;
+const agencyCount = new Set(news.flatMap((n) => n.agencies.map((a) => a.slug))).size;
+---
+<Base
+  title="Noticias — Agency Atlas"
+  description={`${stats.news} noticias de prensa sectorial sobre las agencias españolas, procedentes de ${stats.sources} medios. Nuevos negocios, nombramientos, campañas y premios.`}
+  active="news"
+>
+  <div class="container">
+    <section class="page-head">
+      <p class="eyebrow"><span class="dot"></span>Actualidad · {stats.news} noticias</p>
+      <h1 class="page-title">El hilo de la <em>actualidad</em>.</h1>
+      <p class="page-lede">
+        Nuevos negocios, nombramientos, campañas, premios y operaciones corporativas: {stats.news} noticias de
+        {stats.sources} medios sectoriales, cada una vinculada a las agencias que aparecen en la cobertura. Lee la
+        fuente y salta a la ficha.
+      </p>
+      <div class="page-stats">
+        <span class="page-stat"><b>{stats.news}</b> noticias</span>
+        <span class="page-stat"><b>{stats.sources}</b> medios</span>
+        <span class="page-stat"><b>{agencyCount}</b> agencias cubiertas</span>
+        <span class="page-stat"><b>{appointments}</b> nombramientos</span>
+        <span class="page-stat"><b>{fmtDate(stats.newsRange.from)}</b> → <b>{fmtDate(stats.newsRange.to)}</b></span>
+      </div>
+    </section>
+  </div>
+
+  <div data-explorer>
+    <div class="explorer-sticky">
+      <div class="container">
+        <div class="toolbar">
+          <label class="field">
+            <Icon name="search" />
+            <input
+              type="search"
+              data-filter-search
+              placeholder="Buscar titulares, agencias o temas…"
+              aria-label="Buscar noticias"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </label>
+          <label class="select">
+            <select data-filter="source" aria-label="Filtrar por medio">
+              <option value="">Todos los medios</option>
+              {aggregates.bySource.map((s) => <option value={s.key}>{sourceLabel(s.key)} ({s.value})</option>)}
+            </select>
+          </label>
+          <label class="select">
+            <select data-sort aria-label="Ordenar noticias">
+              <option value="newest" data-sort-key="published" data-dir="desc">Más recientes</option>
+              <option value="oldest" data-sort-key="published" data-dir="asc">Más antiguas</option>
+              <option value="headline" data-sort-key="title" data-dir="asc">Titular A–Z</option>
+            </select>
+          </label>
+          <span class="toolbar-count"><b data-count>{stats.news}</b> noticias</span>
+        </div>
+        <div class="filters" role="group" aria-label="Filtrar por tema">
+          <button class="filter-chip" type="button" data-filter="category" data-value="all" aria-pressed="true">
+            Todos los temas <span class="n">{stats.news}</span>
+          </button>
+          {aggregates.byCategory.map((c) => (
+            <button class="filter-chip" type="button" data-filter="category" data-value={c.key} aria-pressed="false">
+              <span class="dot" style={`--c:${categoryMeta(c.key).color}`}></span>
+              {categoryMeta(c.key).label}
+              <span class="n">{c.value}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="news-layout" style="padding-top:24px">
+        <div class="results" style="padding-top:0">
+          <div class="results-head">
+            <span class="results-label">Mostrando <b data-count>{stats.news}</b> de {stats.news} noticias</span>
+            <div class="results-tools">
+              <span class="results-label" aria-hidden="true">FUENTE → FICHA</span>
+              <button class="reset-link" type="button" data-reset>Limpiar ×</button>
+            </div>
+          </div>
+
+          <div class="news-feed" data-items>
+            {news.map((n) => {
+              const d = dateParts(n.publishedAt);
+              const cat = categoryMeta(n.category);
+              return (
+                <article
+                  class="news-item"
+                  id={`n-${n.id}`}
+                  data-item
+                  data-search={searchText(n)}
+                  data-category={n.category}
+                  data-source={n.source}
+                  data-sort-published={n.publishedAt ?? ""}
+                  data-sort-title={n.title.toLowerCase()}
+                >
+                  <div class="news-date"><b>{d.day}</b>{d.month} {d.year}</div>
+                  <div style="min-width:0">
+                    <a class="news-title" href={n.url} target="_blank" rel="noopener noreferrer">{n.title}</a>
+                    {n.summary && <p class="news-summary">{n.summary}</p>}
+                    <div class="news-meta">
+                      <span class="badge" style={`--badge:${cat.color}`}>{cat.label}</span>
+                      <a class="news-source" href={n.url} target="_blank" rel="noopener noreferrer">{sourceLabel(n.source)}</a>
+                      {n.sentiment && <span class="news-source">· {n.sentiment}</span>}
+                    </div>
+                    {n.agencies.length > 0 && (
+                      <div class="news-agencies">
+                        {n.agencies.slice(0, 4).map((a) => {
+                          const cls = classMeta(agencyBySlug.get(a.slug)?.classification ?? "");
+                          return (
+                            <a class="chip chip--dot" style={`--chip-color:${cls.color}`} href={`/agencias/${a.slug}/`}>{a.name}</a>
+                          );
+                        })}
+                        {n.agencies.length > 4 && <span class="more">+{n.agencies.length - 4}</span>}
+                      </div>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+
+          <div class="empty" data-empty>
+            <Icon name="search" size={26} />
+            <p>Ninguna noticia coincide con esos filtros.</p>
+            <button type="button" data-reset>Quitar filtros</button>
+          </div>
+        </div>
+
+        <aside class="news-aside news-aside--static">
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <p class="card-kicker">Fuentes</p>
+                <h2 class="card-title">Reparto de la cobertura</h2>
+              </div>
+              <span class="card-meta">{stats.sources} MEDIOS</span>
+            </div>
+            <div class="card-body">
+              <BarList items={sourceItems} showShare />
+              <div class="mini-rule"></div>
+              <p class="note">
+                <Icon name="info" />
+                Dircomfidencial y MarketingDirecto concentran el {pct(
+                  (aggregates.bySource[0]?.value ?? 0) + (aggregates.bySource[1]?.value ?? 0),
+                  stats.news,
+                )} % de las noticias.
+              </p>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <p class="card-kicker">Temas</p>
+                <h2 class="card-title">De qué se habla</h2>
+              </div>
+              <span class="card-meta">{stats.news}</span>
+            </div>
+            <div class="card-body">
+              <BarList items={categoryItems} showShare />
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <p class="card-kicker">Más cubiertas</p>
+                <h2 class="card-title">Agencias en las noticias</h2>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="ownership-list">
+                {mostCovered.map((a) => (
+                  <div class="ownership-row">
+                    <i class="legend-dot" style="--c:#c9f158"></i>
+                    <span class="legend-label"><a href={`/agencias/${a.slug}/`}>{a.name}</a></span>
+                    <span class="legend-count">{a.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <p class="card-kicker">Leer la actualidad</p>
+                <h2 class="card-title">Cómo leer esto</h2>
+              </div>
+            </div>
+            <div class="card-body">
+              <p class="note">
+                <Icon name="info" />
+                Las noticias se deduplican por URL, no por acontecimiento: un mismo nombramiento puede aparecer
+                en varios medios. Los titulares y resúmenes se mantienen en su idioma original. El sentimiento no
+                está poblado en la fuente.
+              </p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    import "../scripts/explorer.js";
+  </script>
+</Base>

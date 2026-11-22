@@ -1,0 +1,125 @@
+---
+import Base from "../layouts/Base.astro";
+import Icon from "../components/ui/Icon.astro";
+import { data, plural } from "../lib/data";
+
+const { clients, stats } = data;
+const sorted = [...clients].sort((a, b) => b.agencyCount - a.agencyCount || a.name.localeCompare(b.name, "es"));
+const top = sorted[0];
+const withFourPlus = clients.filter((c) => c.agencyCount >= 4).length;
+const withOne = clients.filter((c) => c.agencyCount === 1).length;
+const zero = clients.filter((c) => c.agencyCount === 0).length;
+const average = (stats.agencyClientsLinks / Math.max(stats.clients, 1)).toFixed(1);
+
+const searchText = (c: (typeof clients)[number]) =>
+  [c.name, ...c.agencies.map((a) => a.name)].join(" ").toLowerCase();
+---
+<Base
+  title="Clientes — Agency Atlas"
+  description={`${stats.clients} marcas cliente vinculadas a las agencias que las atienden: ${stats.agencyClientsLinks} relaciones documentadas.`}
+  active="clients"
+>
+  <div class="container">
+    <section class="page-head">
+      <p class="eyebrow"><span class="dot"></span>Cartera · {stats.clients} marcas</p>
+      <h1 class="page-title">La cartera de <em>clientes</em>.</h1>
+      <p class="page-lede">
+        Qué marcas trabajan con qué agencias. {stats.clients} marcas cliente conectadas a agencias mediante
+        {stats.agencyClientsLinks} relaciones documentadas: desde Coca-Cola y Mahou hasta Ikea, Iberia y Loterías.
+      </p>
+      <div class="page-stats">
+        <span class="page-stat"><b>{stats.clients}</b> marcas</span>
+        <span class="page-stat"><b>{stats.agencyClientsLinks}</b> vínculos con agencias</span>
+        <span class="page-stat"><b>{top?.agencyCount}</b> máximo para una marca</span>
+        <span class="page-stat"><b>{withFourPlus}</b> marcas con 4+ agencias</span>
+        <span class="page-stat"><b>{average}</b> agencias por marca</span>
+      </div>
+    </section>
+  </div>
+
+  <div data-explorer>
+    <div class="explorer-sticky">
+      <div class="container">
+        <div class="toolbar">
+          <label class="field">
+            <Icon name="search" />
+            <input
+              type="search"
+              data-filter-search
+              placeholder="Buscar una marca o una agencia…"
+              aria-label="Buscar clientes"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </label>
+          <label class="select">
+            <select data-sort aria-label="Ordenar clientes">
+              <option value="agencies" data-dir="desc">Más agencias</option>
+              <option value="name" data-dir="asc">Nombre A–Z</option>
+            </select>
+          </label>
+          <span class="toolbar-count"><b data-count>{stats.clients}</b> marcas</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="results">
+        <div class="results-head">
+          <span class="results-label">Mostrando <b data-count>{stats.clients}</b> de {stats.clients} marcas</span>
+          <div class="results-tools">
+            <span class="results-label" aria-hidden="true">{withOne} CON UNA SOLA AGENCIA</span>
+            <button class="reset-link" type="button" data-reset>Limpiar ×</button>
+          </div>
+        </div>
+
+        <div class="clients-grid" data-items style="margin-top:18px">
+          {clients.map((c) => (
+            <article
+              class="client-card"
+              id={`c-${c.id}`}
+              data-item
+              data-search={searchText(c)}
+              data-sort-name={c.name.toLowerCase()}
+              data-sort-agencies={c.agencyCount}
+            >
+              <div class="client-top">
+                <h3 class="client-name">{c.name}</h3>
+                <span class="client-count">
+                  <b>{c.agencyCount}</b>
+                  {plural(c.agencyCount, "agencia", "agencias")}
+                </span>
+              </div>
+              {c.agencies.length > 0 ? (
+                <div class="client-agencies">
+                  {c.agencies.slice(0, 6).map((a) => (
+                    <a class="chip" href={`/agencias/${a.slug}/`}>{a.name}</a>
+                  ))}
+                  {c.agencies.length > 6 && <span class="more">+{c.agencies.length - 6} más</span>}
+                </div>
+              ) : (
+                <p class="note"><Icon name="info" />Sin agencia vinculada.</p>
+              )}
+            </article>
+          ))}
+        </div>
+
+        <div class="empty" data-empty>
+          <Icon name="search" size={26} />
+          <p>Ninguna marca coincide con esa búsqueda.</p>
+          <button type="button" data-reset>Quitar filtros</button>
+        </div>
+      </div>
+
+      <p class="note" style="margin-top:26px">
+        <Icon name="info" />
+        El sector está vacío en todas las filas de origen, así que las marcas se muestran sin vertical.
+        {zero} marcas no tienen agencia vinculada y {withOne} están conectadas a una sola agencia.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    import "../scripts/explorer.js";
+  </script>
+</Base>

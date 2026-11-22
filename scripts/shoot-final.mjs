@@ -1,0 +1,14 @@
+import { chromium } from "playwright-core";
+const browser = await chromium.launch({ executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", args: ["--no-sandbox", "--disable-crashpad"] });
+const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, reducedMotion: "reduce" });
+await page.goto("http://127.0.0.1:4323/agencias/havas-creative-spain/", { waitUntil: "networkidle" });
+await page.screenshot({ path: ".screenshots/final-detail.png", fullPage: true });
+await page.goto("http://127.0.0.1:4323/agencias/toaster/", { waitUntil: "networkidle" });
+await page.screenshot({ path: ".screenshots/final-detail-empty.png", fullPage: true });
+await page.goto("http://127.0.0.1:4323/", { waitUntil: "networkidle" });
+await page.waitForTimeout(400);
+await page.locator("[data-search-open]").click();
+await page.fill("[data-search-input]", "barcelona");
+await page.waitForTimeout(700);
+await page.screenshot({ path: ".screenshots/final-search.png" });
+await browser.close();

@@ -1,0 +1,44 @@
+---
+import { fmtDate } from "../../lib/data";
+
+interface Day {
+  date: string;
+  value: number;
+}
+interface Props {
+  days: Day[];
+}
+const { days } = Astro.props;
+const peak = Math.max(...days.map((d) => d.value), 1);
+const total = days.reduce((acc, d) => acc + d.value, 0);
+const peakDay = days.reduce((best, d) => (d.value > best.value ? d : best), days[0]);
+const activeDays = days.filter((d) => d.value > 0).length;
+const avg = (total / days.length).toFixed(1);
+const axis = days.length
+  ? [days[0].date, days[Math.floor(days.length / 2)].date, days[days.length - 1].date]
+  : [];
+---
+<div class="pulse" data-chart="pulse">
+  <div class="pulse-plot">
+    <div class="pulse-grid" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    <div class="pulse-bars" role="img" aria-label={`Menciones diarias en prensa desde el ${fmtDate(days[0]?.date)} hasta el ${fmtDate(days.at(-1)?.date)}, ${total} menciones en total`}>
+      {days.map((d) => (
+        <div
+          class:list={["pulse-bar", { "pulse-bar--empty": d.value === 0 }]}
+          data-tip={`${fmtDate(d.date)} · ${d.value} ${d.value === 1 ? "noticia" : "noticias"}`}
+        >
+          <i style={`--h:${d.value === 0 ? 0 : Math.max((d.value / peak) * 100, 4)}%`} />
+        </div>
+      ))}
+    </div>
+  </div>
+  <div class="pulse-axis">
+    {axis.map((date, i) => <span>{i === axis.length - 1 ? `${fmtDate(date)} →` : fmtDate(date)}</span>)}
+  </div>
+  <div class="pulse-footer">
+    <div class="pulse-stat"><span>En la ventana</span><b>{total} <small>menciones</small></b></div>
+    <div class="pulse-stat"><span>Día punta</span><b>{peakDay.value} <small>· {fmtDate(peakDay.date)}</small></b></div>
+    <div class="pulse-stat"><span>Media / día</span><b>{avg} <small>noticias</small></b></div>
+    <div class="pulse-stat"><span>Días activos</span><b>{activeDays} <small>de {days.length}</small></b></div>
+  </div>
+</div>

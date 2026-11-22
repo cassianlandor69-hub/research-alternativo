@@ -1,0 +1,52 @@
+---
+import { data, fmtDate } from "../lib/data";
+const { stats, schemaVersion, ingest } = data;
+const generated = fmtDate(data.generatedAt.slice(0, 10), "long");
+---
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <a class="brand" href="/">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round">
+              <path d="M12 2.8v18.4M2.8 12h18.4M5.5 5.5l13 13M18.5 5.5l-13 13" />
+            </svg>
+          </span>
+          <span class="brand-word"><b>AGENCY</b><span>/</span><b>ATLAS</b></span>
+          <span class="brand-tag">ES</span>
+        </a>
+        <p>Una guía de campo estática del mercado agencial español: {stats.agencies} agencias, {stats.people} personas y {stats.news} noticias, reunidas a partir de <span class="mono">agencies.db</span> en el momento de la compilación.</p>
+      </div>
+
+      <div class="footer-cols">
+        <div class="footer-col">
+          <h4>Explorar</h4>
+          <a href="/agencias/">Agencias</a>
+          <a href="/personas/">Personas</a>
+          <a href="/clientes/">Clientes</a>
+          <a href="/noticias/">Noticias</a>
+        </div>
+        <div class="footer-col">
+          <h4>Datos</h4>
+          <a href="/datos/">Esquema y notas</a>
+          <a href="/dataset.json" download>dataset.json</a>
+          <a href="/search.json">search.json</a>
+          <a href="/datos/#ingest">Registro de ingesta</a>
+        </div>
+        <div class="footer-col">
+          <h4>Fuente</h4>
+          <span>agencies.db</span>
+          <span>esquema v{schemaVersion}</span>
+          <span>{ingest.total} ejecuciones de ingesta</span>
+          <span>{generated}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <span class="live"><i></i>Compilación estática · todos los registros incluidos</span>
+      <span>Creado con Astro · {stats.agencies} perfiles de agencia</span>
+    </div>
+  </div>
+</footer>
